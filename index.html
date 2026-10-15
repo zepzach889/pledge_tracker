@@ -4,6 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Pledge Roster</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 28 28'><clipPath id='c'><rect width='28' height='28' rx='4'/></clipPath><g clip-path='url(%23c)'><rect y='0' width='28' height='4' fill='%23B22234'/><rect y='4' width='28' height='4' fill='%23FFFFFF'/><rect y='8' width='28' height='4' fill='%23B22234'/><rect y='12' width='28' height='4' fill='%23FFFFFF'/><rect y='16' width='28' height='4' fill='%23B22234'/><rect y='20' width='28' height='4' fill='%23FFFFFF'/><rect y='24' width='28' height='4' fill='%23B22234'/><rect width='14' height='16' fill='%233C3B6E'/><circle cx='3' cy='3' r='1.1' fill='white'/><circle cx='7' cy='3' r='1.1' fill='white'/><circle cx='11' cy='3' r='1.1' fill='white'/><circle cx='5' cy='6' r='1.1' fill='white'/><circle cx='9' cy='6' r='1.1' fill='white'/><circle cx='3' cy='9' r='1.1' fill='white'/><circle cx='7' cy='9' r='1.1' fill='white'/><circle cx='11' cy='9' r='1.1' fill='white'/><circle cx='5' cy='12' r='1.1' fill='white'/><circle cx='9' cy='12' r='1.1' fill='white'/></g></svg>">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Bitter:wght@500;700;800&family=Source+Sans+3:wght@400;600;700&display=swap" rel="stylesheet">
@@ -642,7 +643,15 @@ function render(){
   if (drawsDirty){ drawsDirty = false; persist(); }
 }
 const metaOf = s => [s.grade && `Grade ${esc(s.grade)}`, s.teacher && esc(s.teacher)].filter(Boolean).join(', ');
-const unitMeta = t => activeMembers(t).map(m => { const x = metaOf(S(m)); return x ? `${esc(S(m).name.split(' ')[0])}: ${x}` : ''; }).filter(Boolean).join('; ');
+// One advisory line when everyone shares it; otherwise "Austen & Ramsey: Moore; Kai: Lee"
+function groupDetails(people, detailFn){
+  const groups = [];
+  people.forEach(s => { const d = detailFn(s); if (!d) return; const g = groups.find(g => g.d === d); if (g) g.who.push(s); else groups.push({ d, who:[s] }); });
+  const withDetail = groups.reduce((n, g) => n + g.who.length, 0);
+  if (groups.length === 1 && withDetail === people.length) return groups[0].d;
+  return groups.map(g => `${g.who.map(s => esc(s.name.split(' ')[0])).join(' &amp; ')}: ${g.d}`).join('; ');
+}
+const unitMeta = t => groupDetails(activeMembers(t).map(S), metaOf);
 function waitingFlag(t){
   const u = state.units[t.uid]; if (u.random || u.members.length !== 1) return '';
   const s = S(u.members[0]);
@@ -671,7 +680,7 @@ function renderWeek(){
       <div class="leader">${esc(unitName(L))}</div>
       <div class="meta">${unitMeta(L) || '&nbsp;'}</div>
       ${flag ? `<div class="flag">${flag}</div>` : ''}
-      <div class="backup">${B ? `Backup: <strong>${esc(unitName(B))}</strong> <span class="meta">${unitMeta(B)}</span>` : `<span class="meta">Add more students to have a backup.</span>`}</div>
+      <div class="backup">${B ? `Backup: <strong>${esc(unitName(B))}</strong>${unitMeta(B) ? `<div class="meta">${unitMeta(B)}</div>` : ''}` : `<span class="meta">Add more students to have a backup.</span>`}</div>
       <div class="actions">
         <button class="btn primary" id="doneBtn">${esc(firstNames(L))} did it</button>
         <button class="btn warn" id="fillBtn" ${B ? '' : 'disabled'}>Backup stepped in</button>
@@ -1062,7 +1071,7 @@ function renderReport(){
   const people = t => activeMembers(t).map(S);
   const detail = s => [o.grade && s.grade && `Grade ${esc(s.grade)}`, o.advisory && s.teacher && esc(s.teacher)].filter(Boolean).join(', ');
   const names = t => people(t).map(s => esc(s.name)).join(' &amp; ');
-  const details = t => { const ps = people(t); return ps.map(s => { const d = detail(s); return d ? (ps.length > 1 ? `${esc(s.name.split(' ')[0])}: ${d}` : d) : ''; }).filter(Boolean).join('; '); };
+  const details = t => groupDetails(people(t), detail);
   const head = `${o.banner ? `<img class="banner" src="${BANNER}" alt="">` : ''}<div class="rbody">
     <h1 class="rtitle">${esc(o.title)}</h1>${o.sub ? `<p class="rsub">${esc(o.sub)}</p>` : ''}<div class="rule"></div>`;
   const all = upcoming(80), first = all.findIndex(w => !w.skip);
@@ -1080,7 +1089,7 @@ function renderReport(){
     <div class="upnext">
       <div><div class="kicker">Up next on the intercom</div><div class="unames">${names(up.leader)}</div>${details(up.leader) ? `<div class="udet">${details(up.leader)}</div>` : ''}</div>
       <div class="udate"><span>Week of</span><strong>${longDate(up.date)}</strong></div>
-      <div class="ubackup">Backup: <strong>${up.backup ? names(up.backup) : 'none yet'}</strong>${up.backup && details(up.backup) ? ` <span class="udet">(${details(up.backup)})</span>` : ''}</div>
+      <div class="ubackup">Backup: <strong>${up.backup ? names(up.backup) : 'none yet'}</strong>${up.backup && details(up.backup) ? `<div class="udet">${details(up.backup)}</div>` : ''}</div>
     </div>
     ${rest.length ? `<h3>Coming up</h3><table><thead><tr><th>Week of</th><th>On the intercom</th>${showDet ? `<th>${detHead}</th>` : ''}${o.backups ? '<th>Backup</th>' : ''}</tr></thead><tbody>${rows}</tbody></table>` : ''}
     ${o.roster ? `<h3>Volunteers (${vols.length})</h3><ul class="rlist">${vols.map(s => `<li>${esc(s.name)}${detail(s) ? ` <span>${detail(s)}</span>` : ''}</li>`).join('')}</ul>` : ''}
