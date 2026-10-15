@@ -1,0 +1,885 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Pledge Roster</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bitter:wght@500;700;800&family=Source+Sans+3:wght@400;600;700&display=swap" rel="stylesheet">
+<style>
+:root{
+  --paper:#F7F8F6; --surface:#FFFFFF; --ink:#16213A; --muted:#5A6375;
+  --blue:#1F3A5F; --blue-soft:#E3E9F2; --red:#B22234; --red-soft:#F7E3E5;
+  --gold:#A87A1E; --line:#D5DAE2; --ok:#2E6B45;
+  --head:'Bitter', Georgia, 'Times New Roman', serif;
+  --body:'Source Sans 3', 'Segoe UI', system-ui, -apple-system, sans-serif;
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --paper:#0F1622; --surface:#18212F; --ink:#E8ECF2; --muted:#A3ADBD;
+    --blue:#8FB0DA; --blue-soft:#1E2B40; --red:#F07A86; --red-soft:#3A1C22;
+    --gold:#D9AE57; --line:#2C3748; --ok:#7CC496;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"]{
+  --paper:#0F1622; --surface:#18212F; --ink:#E8ECF2; --muted:#A3ADBD;
+  --blue:#8FB0DA; --blue-soft:#1E2B40; --red:#F07A86; --red-soft:#3A1C22;
+  --gold:#D9AE57; --line:#2C3748; --ok:#7CC496; color-scheme: dark;
+}
+:root{box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+*,*::before,*::after{box-sizing:border-box}
+html,body{margin:0}
+td input[type=checkbox]{width:18px;height:18px;accent-color:var(--red)}
+tr.skipped td{color:var(--muted);font-style:italic}
+.status{font-size:.88rem;color:var(--muted);margin-top:4px}
+body{background:var(--paper);color:var(--ink);font-family:var(--body);font-size:17px;line-height:1.5}
+.wrap{max-width:900px;margin:0 auto;padding:24px 20px 60px}
+header.top{display:flex;align-items:flex-end;justify-content:space-between;gap:16px;flex-wrap:wrap;border-bottom:3px solid var(--blue);padding-bottom:12px}
+header.top h1{font-family:var(--head);font-weight:800;font-size:2rem;margin:0;color:var(--blue);letter-spacing:-.01em}
+header.top p{margin:2px 0 0;color:var(--muted)}
+.stripes{display:flex;gap:4px}
+.stripes span{width:28px;height:6px;background:var(--red);border-radius:3px}
+.stripes span:nth-child(2){background:var(--line)}
+nav{display:flex;gap:6px;flex-wrap:wrap;margin:18px 0 24px}
+nav button{font:600 .95rem var(--body);background:transparent;color:var(--muted);border:1px solid var(--line);border-radius:999px;padding:7px 16px;cursor:pointer}
+nav button[aria-selected="true"]{background:var(--blue);border-color:var(--blue);color:var(--paper)}
+button:focus-visible,input:focus-visible,select:focus-visible{outline:3px solid var(--gold);outline-offset:2px}
+h2{font-family:var(--head);font-weight:700;font-size:1.35rem;margin:0 0 12px}
+.panel{display:none}.panel.on{display:block}
+
+/* This week */
+.mic{background:var(--surface);border:1px solid var(--line);border-left:8px solid var(--red);border-radius:14px;padding:26px 28px}
+.mic .when{color:var(--muted);font-weight:600;display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.mic .when input{font:inherit;color:var(--ink);background:var(--paper);border:1px solid var(--line);border-radius:8px;padding:3px 8px}
+.mic .leader{font-family:var(--head);font-weight:800;font-size:clamp(2.2rem,7vw,3.6rem);line-height:1.05;margin:10px 0 4px;color:var(--ink)}
+.mic .meta{color:var(--muted)}
+.mic .backup{margin-top:18px;padding-top:14px;border-top:1px dashed var(--line)}
+.mic .backup strong{font-family:var(--head);font-size:1.3rem}
+.actions{display:flex;flex-wrap:wrap;gap:10px;margin-top:22px}
+.btn{font:600 1rem var(--body);border-radius:10px;padding:10px 16px;cursor:pointer;border:1px solid var(--line);background:var(--surface);color:var(--ink)}
+.btn.primary{background:var(--blue);border-color:var(--blue);color:var(--paper)}
+.btn.warn{background:var(--red-soft);border-color:var(--red);color:var(--red)}
+.btn:disabled{opacity:.45;cursor:not-allowed}
+.btn.sm{padding:5px 10px;font-size:.88rem;border-radius:8px}
+.next{margin-top:26px}
+.next ol{list-style:none;padding:0;margin:0;border:1px solid var(--line);border-radius:12px;overflow:hidden;background:var(--surface)}
+.next li{display:flex;justify-content:space-between;gap:12px;padding:10px 16px;border-top:1px solid var(--line)}
+.next li:first-child{border-top:0}
+.next .d{color:var(--muted);white-space:nowrap}
+.empty{background:var(--surface);border:2px dashed var(--line);border-radius:14px;padding:30px;text-align:center;color:var(--muted)}
+.empty .btn{margin-top:12px}
+
+/* Tables */
+.tablewrap{overflow-x:auto;border:1px solid var(--line);border-radius:12px;background:var(--surface)}
+table{border-collapse:collapse;width:100%;font-size:.97rem}
+th,td{text-align:left;padding:9px 12px;border-top:1px solid var(--line);vertical-align:middle}
+thead th{border-top:0;background:var(--blue-soft);font-weight:700;color:var(--ink)}
+tr.inactive td{color:var(--muted);text-decoration:line-through}
+tr.inactive td.keep{text-decoration:none}
+td.num{color:var(--muted);width:2.5em}
+.rowbtns{display:flex;gap:4px;flex-wrap:wrap}
+.toolbar{display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin-bottom:14px}
+.toolbar input{font:inherit;padding:8px 10px;border:1px solid var(--line);border-radius:8px;background:var(--surface);color:var(--ink);min-width:0;flex:1 1 180px}
+.note{color:var(--muted);font-size:.93rem;max-width:68ch}
+.tag{display:inline-block;font-size:.8rem;font-weight:700;padding:1px 8px;border-radius:999px}
+.tag.lead{background:var(--blue-soft);color:var(--blue)}
+.tag.fill{background:var(--red-soft);color:var(--red)}
+.tag.skip{background:var(--paper);color:var(--muted);border:1px solid var(--line)}
+
+/* Import */
+.step{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:18px 20px;margin-bottom:16px}
+.step h3{font-family:var(--head);margin:0 0 8px;font-size:1.1rem}
+.map{display:grid;grid-template-columns:minmax(140px,220px) 1fr;gap:8px 14px;align-items:center;margin:12px 0}
+.map select{font:inherit;padding:6px 8px;border:1px solid var(--line);border-radius:8px;background:var(--paper);color:var(--ink)}
+.toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);background:var(--ink);color:var(--paper);padding:10px 18px;border-radius:10px;font-weight:600;opacity:0;pointer-events:none;transition:opacity .2s}
+.toast.show{opacity:1}
+@media (prefers-reduced-motion: reduce){.toast{transition:none}}
+.printhead{display:none}
+
+@media print{
+  body{background:#fff;color:#000;font-size:12pt}
+  header.top,nav,.toolbar,.noprint,.toast{display:none!important}
+  .panel{display:none!important}
+  #p-schedule{display:block!important}
+  .printhead{display:block;font-family:var(--head);font-size:18pt;margin-bottom:10px}
+  .tablewrap{border:1px solid #999}
+  thead th{background:#eee;color:#000}
+}
+@media (max-width:560px){
+  .map{grid-template-columns:1fr}
+  .mic{padding:20px}
+}
+.unitnames{font-weight:600}
+.member{display:flex;flex-wrap:wrap;align-items:center;gap:6px 10px;padding:3px 0}
+.member .sub{color:var(--muted);font-size:.9rem}
+.member.off .nm{color:var(--muted);text-decoration:line-through}
+.tag.wait{background:var(--red-soft);color:var(--red)}
+.tag.pair{background:var(--blue-soft);color:var(--blue)}
+.review{background:var(--surface);border:1px solid var(--line);border-left:6px solid var(--gold);border-radius:12px;padding:14px 18px;margin-bottom:12px}
+.review p{margin:0 0 10px}
+.review .actions{margin-top:0}
+.plain{list-style:none;padding:0;margin:0 0 24px;border:1px solid var(--line);border-radius:12px;background:var(--surface);overflow:hidden}
+.plain li{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:10px 16px;border-top:1px solid var(--line);flex-wrap:wrap}
+.plain li:first-child{border-top:0}
+select.pairsel{font:inherit;font-size:.88rem;padding:4px 6px;border:1px solid var(--line);border-radius:8px;background:var(--paper);color:var(--ink)}
+.flag{margin-top:10px;color:var(--red);font-weight:600}
+nav .count{display:inline-block;min-width:1.4em;margin-left:6px;padding:0 6px;border-radius:999px;background:var(--red);color:#fff;font-size:.8rem}
+.ask{position:fixed;inset:0;background:rgba(10,16,28,.45);display:flex;align-items:center;justify-content:center;padding:20px;z-index:20}
+.ask[hidden]{display:none}
+.ask .box{background:var(--surface);color:var(--ink);border:1px solid var(--line);border-top:6px solid var(--red);border-radius:14px;padding:22px 24px;max-width:420px;width:100%}
+.ask p{margin:0 0 16px;font-size:1.05rem}
+.ask .actions{margin-top:0;justify-content:flex-end}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="top">
+    <div>
+      <h1>Pledge Roster</h1>
+      <p>Weekly intercom Pledge of Allegiance, with a backup ready.</p>
+      <div class="status" id="syncStatus">Loading your roster…</div>
+    </div>
+    <div class="stripes" aria-hidden="true"><span></span><span></span><span></span></div>
+  </header>
+
+  <nav role="tablist" aria-label="Sections">
+    <button role="tab" data-tab="week" aria-selected="true">This week</button>
+    <button role="tab" data-tab="schedule" aria-selected="false">Schedule</button>
+    <button role="tab" data-tab="partners" aria-selected="false">Partners<span id="reviewCount"></span></button>
+    <button role="tab" data-tab="roster" aria-selected="false">Rotation</button>
+    <button role="tab" data-tab="import" aria-selected="false">Import sign-ups</button>
+    <button role="tab" data-tab="history" aria-selected="false">History</button>
+  </nav>
+
+  <section class="panel on" id="p-week"></section>
+
+  <section class="panel" id="p-schedule">
+    <div class="toolbar">
+      <label>Weeks to show <select id="weeksShown" class="btn sm">
+        <option>6</option><option selected>10</option><option>20</option><option value="40">40 (whole year)</option></select></label>
+      <button class="btn primary" id="csvBtn" hidden>Download for Sheets</button>
+      <button class="btn" id="copyBtn">Copy as text</button>
+    </div>
+    <div id="scheduleBody"></div>
+    <p class="note">Tick "No pledge" for breaks and no-school weeks ahead of time; the rotation picks up the next week where it left off. If a leader is absent, the backup reads the Pledge and the original leader moves into the next week's slot, so nobody loses their turn.</p>
+  </section>
+
+  <section class="panel" id="p-partners"></section>
+
+  <section class="panel" id="p-roster">
+    <div class="toolbar">
+      <input id="addName" placeholder="Add a student by name (goes solo)">
+      <button class="btn" id="addBtn">Add</button>
+      <button class="btn" id="shuffleBtn">Shuffle order</button>
+    </div>
+    <div id="rosterBody"></div>
+    <p class="note">Each row is one turn: a solo student, a friend pair, or a random pair from the any-partner group (new partners each time through). The rotation runs top to bottom, then starts over. Pause a student who is out for a while; their partner reads alone. Remove only students who have withdrawn.</p>
+    <div class="step" style="margin-top:20px">
+      <h3>Backup file</h3>
+      <p class="note">Your roster saves automatically in this browser. Save a backup file now and then, since clearing browser data or switching computers would leave the roster behind. Restore the file to pick up where you left off.</p>
+      <div class="actions">
+        <button class="btn primary" id="exportBtn" hidden>Save backup file</button>
+        <label class="btn">Restore from backup<input type="file" id="restoreFile" accept=".json,application/json" hidden></label>
+        <button class="btn warn" id="resetBtn">Clear everything</button>
+      </div>
+    </div>
+  </section>
+
+  <section class="panel" id="p-import">
+    <div class="step">
+      <h3>1. Download the Form responses</h3>
+      <p class="note">Open the Form's response sheet in Google Sheets, then choose File &gt; Download &gt; Comma-separated values (.csv).</p>
+    </div>
+    <div class="step">
+      <h3>2. Choose the file</h3>
+      <label class="btn primary">Choose CSV file<input type="file" id="csvFile" accept=".csv,text/csv" hidden></label>
+      <span id="csvName" class="note" style="margin-left:10px"></span>
+    </div>
+    <div class="step" id="mapStep" hidden>
+      <h3>3. Match the columns</h3>
+      <div class="map">
+        <label for="mName">Student name</label><select id="mName"></select>
+        <label for="mLast">Last name (if separate)</label><select id="mLast"></select>
+        <label for="mGrade">Grade</label><select id="mGrade"></select>
+        <label for="mTeacher">Advisory teacher</label><select id="mTeacher"></select>
+        <label for="mPref">Solo or partner question</label><select id="mPref"></select>
+        <label for="mFriend">Friend's name</label><select id="mFriend"></select>
+      </div>
+      <p class="note" id="importPreview"></p>
+      <button class="btn primary" id="doImport">Add to roster</button>
+    </div>
+    <p class="note">Re-importing is safe. Students already on the roster are skipped, new sign-ups go to the end of the rotation, and any friend requests that now have a match get paired.</p>
+  </section>
+
+  <section class="panel" id="p-history"><div id="historyBody"></div></section>
+</div>
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+<div class="ask" id="ask" hidden role="dialog" aria-modal="true" aria-labelledby="askText">
+  <div class="box"><p id="askText"></p>
+    <div class="actions"><button class="btn" id="askNo">Cancel</button><button class="btn warn" id="askYes">Yes</button></div></div>
+</div>
+
+<script>
+const KEY = 'pledgeRoster.v3';
+const blank = () => ({ v:3, students:{}, units:{}, order:[], currentId:null, cycle:0, draws:{}, poolSig:'', weekDate:null, history:[], skipDates:[] });
+let state = blank();
+let undoStack = [];
+let csvRows = null;
+let cloud = null, downloads = null, saveTimer = null, drawsDirty = false;
+
+/* ---------- helpers ---------- */
+const $ = s => document.querySelector(s);
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const newId = p => p + Date.now().toString(36) + Math.random().toString(36).slice(2,7);
+const norm = s => String(s||'').toLowerCase().replace(/[^a-z\s'-]/g,'').trim().replace(/\s+/g,' ');
+function toast(msg){ const t = $('#toast'); t.textContent = msg; t.classList.add('show'); clearTimeout(toast._t); toast._t = setTimeout(()=>t.classList.remove('show'), 2400); }
+function setStatus(t){ $('#syncStatus').textContent = t; }
+function addDays(iso, n){ const [y,m,d] = iso.split('-').map(Number); return new Date(Date.UTC(y, m-1, d+n)).toISOString().slice(0,10); }
+function fmtDate(iso){ if (!iso) return ''; const [y,m,d] = iso.split('-').map(Number);
+  return new Date(Date.UTC(y,m-1,d)).toLocaleDateString(undefined,{weekday:'short',month:'short',day:'numeric',timeZone:'UTC'}); }
+function nextMonday(){
+  const now = new Date(), day = now.getDay(), diff = day === 1 ? 0 : (8 - day) % 7;
+  const t = new Date(now.getFullYear(), now.getMonth(), now.getDate() + diff);
+  return `${t.getFullYear()}-${String(t.getMonth()+1).padStart(2,'0')}-${String(t.getDate()).padStart(2,'0')}`;
+}
+function lev(a, b){
+  const m = a.length, n = b.length; if (!m) return n; if (!n) return m;
+  let prev = Array.from({length:n+1}, (_,j) => j);
+  for (let i = 1; i <= m; i++){ const cur = [i];
+    for (let j = 1; j <= n; j++) cur[j] = Math.min(prev[j]+1, cur[j-1]+1, prev[j-1] + (a[i-1] === b[j-1] ? 0 : 1));
+    prev = cur; }
+  return prev[n];
+}
+function shuffle(a){ for (let i = a.length-1; i > 0; i--){ const j = Math.floor(Math.random()*(i+1)); [a[i],a[j]] = [a[j],a[i]]; } return a; }
+function askConfirm(msg, yesLabel){
+  return new Promise(resolve => {
+    const box = $('#ask'), yes = $('#askYes'), no = $('#askNo');
+    $('#askText').textContent = msg; yes.textContent = yesLabel || 'Yes';
+    box.hidden = false; yes.focus();
+    const done = v => { box.hidden = true; yes.onclick = no.onclick = box.onkeydown = null; resolve(v); };
+    yes.onclick = () => done(true); no.onclick = () => done(false);
+    box.onkeydown = e => { if (e.key === 'Escape') done(false); };
+  });
+}
+
+/* ---------- storage ---------- */
+const prefOf = s => s.resolved === 'solo' ? 'solo' : s.resolved === 'anyone' ? 'anyone' : s.pref;
+function migrate(st){
+  st = Object.assign(blank(), st);
+  st.draws = st.draws || {}; st.cycle = st.cycle || 0;
+  if (!Object.keys(st.units).length && st.order.length && st.students[st.order[0]]){
+    st.units = {};
+    st.order = st.order.map(sid => { const id = newId('u'); st.units[id] = { id, members:[sid], locked:false }; if (st.currentId === sid) st.currentId = id; return id; });
+  }
+  Object.values(st.students).forEach(s => { s.pref = s.pref || 'solo'; s.friendRaw = s.friendRaw || ''; s.rejected = s.rejected || []; s.partners = s.partners || []; });
+  if ((st.v || 0) < 3){
+    // older versions made permanent "any partner" pairs; move those students into the random pool
+    for (const uid of [...st.order]){
+      const u = st.units[uid]; if (!u || u.random || u.locked) continue;
+      if (u.members.length && u.members.every(m => st.students[m] && prefOf(st.students[m]) === 'anyone')){
+        const i = st.order.indexOf(uid); st.order.splice(i,1); delete st.units[uid];
+        if (st.currentId === uid) st.currentId = st.order[Math.min(i, st.order.length-1)] || null;
+      }
+    }
+    st.v = 3; st.poolSig = '';
+  }
+  return st;
+}
+function loadLocal(){
+  try { const raw = localStorage.getItem(KEY) || localStorage.getItem('pledgeRoster.v2') || localStorage.getItem('pledgeRoster.v1'); if (raw) return migrate(JSON.parse(raw)); } catch(e){}
+  return blank();
+}
+function persist(){
+  try { localStorage.setItem(KEY, JSON.stringify(state)); } catch(e){}
+  if (!cloud) return;
+  clearTimeout(saveTimer); setStatus('Saving…');
+  saveTimer = setTimeout(async () => {
+    try { await cloud.ref.set(JSON.parse(JSON.stringify(state))); setStatus('Saved to your account'); }
+    catch(e){ setStatus('Could not save to your account. Changes are kept in this browser for now.'); }
+  }, 600);
+}
+function save(){ sync(); persist(); }
+async function connect(){
+  if (!window.claude || !window.claude.use){
+    $('#exportBtn').hidden = false; $('#csvBtn').hidden = false;
+    setStatus('Saved in this browser. Save a backup file now and then.');
+    return;
+  }
+  try {
+    const [db, user] = await Promise.all([claude.use('db'), claude.use('user')]);
+    downloads = await claude.use('downloads');
+    if (downloads){ $('#exportBtn').hidden = false; $('#csvBtn').hidden = false; }
+    const id = user && await user.id();
+    if (!db || !id){ setStatus('Saving in this browser only.'); return; }
+    const ref = db.doc(`data/users/${id}/pledge`);
+    const snap = await ref.get();
+    cloud = { ref };
+    if (snap.exists){ state = migrate(JSON.parse(JSON.stringify(snap.data()))); render(); setStatus('Saved to your account'); }
+    else if (state.order.length || Object.keys(state.students).length) save();
+    else setStatus('Saved to your account');
+  } catch(e){ setStatus('Saving in this browser only.'); }
+}
+function checkpoint(){ undoStack.push(JSON.stringify(state)); if (undoStack.length > 25) undoStack.shift(); }
+function undo(){ if (!undoStack.length) return; state = JSON.parse(undoStack.pop()); save(); render(); toast('Undone'); }
+
+/* ---------- people, turns, and the random pool ---------- */
+const S = id => state.students[id];
+const unitOf = sid => Object.values(state.units).find(u => !u.random && u.members.includes(sid));
+const single = sid => { const u = unitOf(sid); return u && u.members.length === 1 ? u : null; };
+const poolIds = () => Object.values(state.students).filter(s => s.active && prefOf(s) === 'anyone' && !unitOf(s.id)).map(s => s.id);
+const poolAll = () => Object.values(state.students).filter(s => prefOf(s) === 'anyone' && !unitOf(s.id));
+const randomSlots = () => state.order.filter(id => state.units[id] && state.units[id].random);
+const pairKey = (a,b) => a < b ? a + '|' + b : b + '|' + a;
+
+function avoidSet(c){
+  const set = new Set();
+  Object.values(state.students).forEach(s => s.partners.forEach(p => set.add(pairKey(s.id, p))));
+  const prev = state.draws[c-1];
+  if (prev) Object.values(prev).forEach(g => g.forEach((a,i) => g.slice(i+1).forEach(b => set.add(pairKey(a,b)))));
+  return set;
+}
+// Random groups of two (one trio if the count is odd), fewest repeat partners we can find
+function drawGroups(ids, slots, avoid){
+  const out = {}; if (!slots.length) return out;
+  let best = [], bestScore = Infinity;
+  if (ids.length){
+    for (let t = 0; t < 120 && bestScore > 0; t++){
+      const a = shuffle([...ids]), groups = [];
+      for (let i = 0; i + 1 < a.length; i += 2) groups.push([a[i], a[i+1]]);
+      if (a.length % 2){ if (groups.length) groups[groups.length-1].push(a[a.length-1]); else groups.push([a[0]]); }
+      while (groups.length > slots.length){ const extra = groups.pop(); extra.forEach((m,k) => groups[k % groups.length].push(m)); }
+      let score = 0; groups.forEach(g => g.forEach((x,i) => g.slice(i+1).forEach(y => { if (avoid.has(pairKey(x,y))) score++; })));
+      if (score < bestScore){ best = groups; bestScore = score; }
+    }
+  }
+  slots.forEach((s,i) => out[s] = best[i] || []);
+  return out;
+}
+function getDraw(c){
+  if (!state.draws[c]){ state.draws[c] = drawGroups(poolIds(), randomSlots(), avoidSet(c)); drawsDirty = true; }
+  return state.draws[c];
+}
+function removeUnit(id){
+  const i = state.order.indexOf(id); if (i < 0) return;
+  if (state.currentId === id){ const n = state.order.length; state.currentId = n > 1 ? state.order[(i+1) % n] : null; }
+  state.order.splice(i,1); delete state.units[id];
+}
+// Keep the number of any-partner turns matched to the pool; redraw this time through if the pool changed
+function sync(){
+  const pool = poolIds();
+  const want = pool.length >= 2 ? Math.floor(pool.length / 2) : pool.length;
+  const slots = randomSlots();
+  while (slots.length < want){ const id = newId('r'); state.units[id] = { id, random:true, members:[] }; state.order.push(id); slots.push(id); }
+  while (slots.length > want) removeUnit(slots.pop());
+  const sig = [...pool].sort().join(',') + '/' + [...slots].sort().join(',');
+  if (sig !== state.poolSig){ state.poolSig = sig; repairCycle(); }
+  Object.keys(state.draws).forEach(k => { if (+k < state.cycle - 1) delete state.draws[k]; });
+}
+function repairCycle(){
+  const c = state.cycle, old = state.draws[c] || {};
+  Object.keys(state.draws).forEach(k => { if (+k > c) delete state.draws[k]; });
+  const pool = new Set(poolIds()), slots = randomSlots();
+  const curIdx = Math.max(0, state.order.indexOf(state.currentId));
+  const keep = {}, used = new Set();
+  for (const s of slots){
+    const g = old[s]; if (!g || !g.length) continue;
+    const done = state.order.indexOf(s) < curIdx;
+    const nowIntact = s === state.currentId && g.every(m => pool.has(m));
+    if (done || nowIntact){ keep[s] = g; g.forEach(m => used.add(m)); }
+  }
+  const rest = slots.filter(s => !keep[s]);
+  state.draws[c] = Object.assign(keep, drawGroups([...pool].filter(m => !used.has(m)), rest, avoidSet(c)));
+  drawsDirty = true;
+}
+
+function membersAt(t){
+  const u = state.units[t.uid]; if (!u) return [];
+  return (u.random ? (getDraw(t.c)[t.uid] || []) : u.members).filter(id => S(id));
+}
+const activeMembers = t => membersAt(t).filter(m => S(m).active);
+const isActiveAt = t => activeMembers(t).length > 0;
+function nextTurn(t){
+  const n = state.order.length; if (!n) return null;
+  const i = state.order.indexOf(t.uid);
+  for (let k = 1; k <= 2*n; k++){
+    const j = i + k, cand = { uid: state.order[((j % n) + n) % n], c: t.c + Math.floor(j / n) };
+    if (isActiveAt(cand)) return cand;
+  }
+  return null;
+}
+function leaderTurn(){
+  if (!state.order.length) return null;
+  const c = state.cycle;
+  if (state.order.includes(state.currentId)){
+    const t = { uid: state.currentId, c };
+    return isActiveAt(t) ? t : nextTurn(t);
+  }
+  return nextTurn({ uid: state.order[state.order.length-1], c: c-1 });
+}
+function backupTurn(L){ L = L || leaderTurn(); const B = L && nextTurn(L); return B && !(B.uid === L.uid && B.c === L.c) && B.uid !== L.uid ? B : null; }
+function upcoming(weeks){
+  const out = []; let L = leaderTurn(); if (!L) return out;
+  let date = state.weekDate || nextMonday();
+  const skips = new Set(state.skipDates || []);
+  for (let i = 0; i < weeks; i++){
+    if (skips.has(date)){ out.push({ date, skip:true }); date = addDays(date, 7); continue; }
+    out.push({ date, leader:L, backup: backupTurn(L) });
+    L = nextTurn(L); date = addDays(date, 7);
+  }
+  return out;
+}
+function unitName(t){ const a = activeMembers(t), all = membersAt(t); return (a.length ? a : all).map(m => S(m).name).join(' & '); }
+const firstNames = t => activeMembers(t).map(m => S(m).name.split(' ')[0]).join(' & ');
+
+/* ---------- friend matching ---------- */
+function matchFriend(s){
+  const raw = norm(s.friendRaw); if (!raw) return null;
+  const others = Object.values(state.students).filter(o => o.id !== s.id);
+  const exact = others.filter(o => norm(o.name) === raw);
+  if (exact.length === 1) return { type:'exact', id: exact[0].id };
+  let best = null, bestScore = 0; const rt = raw.split(' ');
+  for (const o of others){
+    if (s.rejected.includes(o.id)) continue;
+    const on = norm(o.name), ot = on.split(' ');
+    let score = 0;
+    if (lev(raw, on) <= 2) score = 3;
+    else if (rt.length > 1 && ot.length > 1 && rt[0] === ot[0] && rt[rt.length-1][0] === ot[ot.length-1][0]) score = 2;
+    else if (rt.length === 1 && rt[0] === ot[0]) score = 1;
+    if (score > bestScore){ best = o; bestScore = score; } else if (score && score === bestScore) best = null;
+  }
+  return best ? { type:'maybe', id: best.id } : null;
+}
+function merge(u1, u2, locked){
+  if (u1 === u2) return;
+  const [keep, drop] = state.order.indexOf(u1) <= state.order.indexOf(u2) ? [u1, u2] : [u2, u1];
+  state.units[keep].members.push(...state.units[drop].members);
+  state.units[keep].locked = !!locked;
+  if (state.currentId === drop) state.currentId = keep;
+  state.order = state.order.filter(x => x !== drop); delete state.units[drop];
+}
+const canJoin = F => F.active && (!unitOf(F.id) || unitOf(F.id).members.length === 1);
+function joinFriend(s, F, locked){
+  const a = unitOf(s.id), fu = unitOf(F.id); if (!a) return;
+  if (fu) merge(a.id, fu.id, locked); else { a.members.push(F.id); a.locked = !!locked; }
+}
+function blockReason(s, F){
+  if (!F.active) return `${F.name} is paused`;
+  const fu = unitOf(F.id);
+  if (fu && fu.members.length > 1) return `${F.name} is already paired with ${fu.members.filter(m => m !== F.id).map(m => S(m).name).join(', ')}`;
+  if (prefOf(F) === 'solo') return `${F.name} signed up to go solo`;
+  if (prefOf(F) === 'friend'){ const back = matchFriend(F); if (!back || back.id !== s.id) return `${F.name} asked for a different friend (${F.friendRaw})`; }
+  return null;
+}
+function autoPair(){
+  let paired = 0;
+  for (const uid of [...state.order]){
+    const u = state.units[uid]; if (!u || u.random || u.members.length !== 1 || u.locked) continue;
+    const s = S(u.members[0]);
+    if (!s.active || prefOf(s) !== 'friend' || s.resolved === 'wait') continue;
+    const m = matchFriend(s); if (!m || m.type !== 'exact') continue;
+    const F = S(m.id), fu = unitOf(F.id);
+    if (fu && fu.locked) continue;
+    if (!blockReason(s, F)){ joinFriend(s, F, false); paired++; }
+  }
+  return paired;
+}
+function reviewItems(){
+  const items = [];
+  for (const uid of state.order){
+    const u = state.units[uid]; if (u.random || u.members.length !== 1) continue;
+    const s = S(u.members[0]);
+    if (!s.active || prefOf(s) !== 'friend' || s.resolved === 'wait') continue;
+    const m = matchFriend(s);
+    if (!m) items.push({ s, kind:'missing' });
+    else if (m.type === 'maybe') items.push({ s, kind:'maybe', F: S(m.id) });
+    else { const why = blockReason(s, S(m.id)); if (why) items.push({ s, kind:'blocked', F: S(m.id), why }); }
+  }
+  return items;
+}
+const waitingList = () => state.order.map(uid => state.units[uid]).filter(u => !u.random && u.members.length === 1)
+  .map(u => S(u.members[0])).filter(s => s.active && prefOf(s) === 'friend' && s.resolved === 'wait');
+
+/* ---------- weekly actions ---------- */
+function log(type, t, note){ state.history.unshift({ date: state.weekDate, type, name: t ? unitName(t) : '', note: note || '', at: new Date().toISOString() }); }
+function credit(t){
+  const ms = activeMembers(t);
+  ms.forEach(m => { S(m).led++; if (state.units[t.uid].random) ms.forEach(o => { if (o !== m && !S(m).partners.includes(o)) S(m).partners.push(o); }); });
+}
+function markDone(){
+  const L = leaderTurn(); if (!L) return;
+  checkpoint(); credit(L); log('lead', L);
+  const N = nextTurn(L); state.currentId = N.uid; state.cycle = N.c;
+  state.weekDate = addDays(state.weekDate, 7);
+  save(); render(); toast(`Logged ${unitName(L)}`);
+}
+function backupStepped(){
+  const L = leaderTurn(), B = backupTurn(L); if (!L || !B) return;
+  checkpoint(); credit(B); log('fill', B, `filled in for ${unitName(L)}`);
+  if (B.c === L.c){ const i = state.order.indexOf(L.uid), j = state.order.indexOf(B.uid); [state.order[i], state.order[j]] = [state.order[j], state.order[i]]; }
+  state.currentId = L.uid; state.cycle = L.c;
+  state.weekDate = addDays(state.weekDate, 7);
+  save(); render(); toast(`${unitName(L)} moves to next week`);
+}
+function skipWeek(){
+  if (!state.weekDate) return;
+  checkpoint(); log('skip', null, 'No Pledge this week');
+  state.skipDates = (state.skipDates || []).filter(d => d !== state.weekDate);
+  state.weekDate = addDays(state.weekDate, 7);
+  save(); render(); toast('Week skipped');
+}
+
+/* ---------- rendering ---------- */
+function render(){
+  sync();
+  renderWeek(); renderSchedule(); renderPartners(); renderRoster(); renderHistory();
+  if (drawsDirty){ drawsDirty = false; persist(); }
+}
+const metaOf = s => [s.grade && `Grade ${esc(s.grade)}`, s.teacher && esc(s.teacher)].filter(Boolean).join(', ');
+const unitMeta = t => activeMembers(t).map(m => { const x = metaOf(S(m)); return x ? `${esc(S(m).name.split(' ')[0])}: ${x}` : ''; }).filter(Boolean).join('; ');
+function waitingFlag(t){
+  const u = state.units[t.uid]; if (u.random || u.members.length !== 1) return '';
+  const s = S(u.members[0]);
+  return prefOf(s) === 'friend' ? `${esc(s.name.split(' ')[0])} asked for a friend who isn't paired yet. Check the Partners tab.` : '';
+}
+function renderWeek(){
+  const el = $('#p-week'), L = leaderTurn();
+  if (!L){
+    el.innerHTML = `<div class="empty"><h2>No students on the roster yet</h2><p>Import the Google Form sign-ups to build the rotation.</p>
+      <button class="btn primary" id="goImport">Import sign-ups</button></div>`;
+    $('#goImport').onclick = () => showTab('import'); return;
+  }
+  if (!state.weekDate){ state.weekDate = nextMonday(); persist(); }
+  const dateInput = `<input type="date" id="weekDate" value="${state.weekDate}" aria-label="Pledge date this week">`;
+  const undoBtn = `<button class="btn" id="undoBtn" ${undoStack.length ? '' : 'disabled'}>Undo</button>`;
+  if ((state.skipDates || []).includes(state.weekDate)){
+    el.innerHTML = `<div class="mic"><div class="when"><span>Week of</span>${dateInput}</div>
+      <div class="leader">No Pledge this week</div>
+      <div class="meta">Marked as a break on the schedule. ${esc(unitName(L))} ${activeMembers(L).length > 1 ? 'are' : 'is'} up next.</div>
+      <div class="actions"><button class="btn primary" id="skipBtn">Go to next week</button>${undoBtn}</div></div>`;
+  } else {
+    const B = backupTurn(L), flag = waitingFlag(L);
+    const next = upcoming(6).slice(1).filter(w => !w.skip).slice(0,3);
+    el.innerHTML = `<div class="mic">
+      <div class="when"><span>On the intercom</span>${dateInput}</div>
+      <div class="leader">${esc(unitName(L))}</div>
+      <div class="meta">${unitMeta(L) || '&nbsp;'}</div>
+      ${flag ? `<div class="flag">${flag}</div>` : ''}
+      <div class="backup">${B ? `Backup: <strong>${esc(unitName(B))}</strong> <span class="meta">${unitMeta(B)}</span>` : `<span class="meta">Add more students to have a backup.</span>`}</div>
+      <div class="actions">
+        <button class="btn primary" id="doneBtn">${esc(firstNames(L))} did it</button>
+        <button class="btn warn" id="fillBtn" ${B ? '' : 'disabled'}>Backup stepped in</button>
+        <button class="btn" id="skipBtn">Skip a week</button>${undoBtn}
+      </div></div>
+      ${next.length ? `<div class="next"><h2>Coming up</h2><ol>${next.map(w => `<li><span>${esc(unitName(w.leader))}</span><span class="d">${fmtDate(w.date)}</span></li>`).join('')}</ol></div>` : ''}`;
+    $('#doneBtn').onclick = markDone; $('#fillBtn').onclick = backupStepped;
+  }
+  $('#skipBtn').onclick = skipWeek; $('#undoBtn').onclick = undo;
+  $('#weekDate').onchange = e => { if (e.target.value){ checkpoint(); state.weekDate = e.target.value; save(); render(); } };
+}
+function renderSchedule(){
+  const weeks = upcoming(+$('#weeksShown').value);
+  if (!weeks.length){ $('#scheduleBody').innerHTML = `<div class="empty">The schedule appears once students are on the roster.</div>`; return; }
+  $('#scheduleBody').innerHTML = `<div class="tablewrap"><table>
+    <thead><tr><th>Date</th><th>On the intercom</th><th>Backup</th><th>No pledge</th></tr></thead>
+    <tbody>${weeks.map(w => w.skip
+      ? `<tr class="skipped"><td>${fmtDate(w.date)}</td><td colspan="2">No Pledge (break)</td><td><input type="checkbox" checked data-skip="${w.date}" aria-label="No pledge week of ${fmtDate(w.date)}"></td></tr>`
+      : `<tr><td>${fmtDate(w.date)}</td><td>${esc(unitName(w.leader))}</td><td>${w.backup ? esc(unitName(w.backup)) : '—'}</td>
+         <td><input type="checkbox" data-skip="${w.date}" aria-label="No pledge week of ${fmtDate(w.date)}"></td></tr>`).join('')}</tbody></table></div>`;
+}
+function studentBtns(s){
+  return `<button class="btn sm" data-sa="toggle" data-s="${s.id}">${s.active ? 'Pause' : 'Resume'}</button>
+    <button class="btn sm" data-sa="remove" data-s="${s.id}">Remove</button>`;
+}
+function renderPartners(){
+  const items = reviewItems(), waiting = waitingList(), pool = poolAll();
+  $('#reviewCount').innerHTML = items.length ? `<span class="count">${items.length}</span>` : '';
+  const pairs = state.order.filter(uid => !state.units[uid].random && state.units[uid].members.length > 1);
+  const text = it => {
+    const s = it.s, fn = esc(s.name);
+    if (it.kind === 'missing') return `<strong>${fn}</strong> asked to go with <strong>${esc(s.friendRaw)}</strong>, who hasn't signed up.`;
+    if (it.kind === 'maybe') return `<strong>${fn}</strong> asked for "${esc(s.friendRaw)}". Did they mean <strong>${esc(it.F.name)}</strong>${it.F.teacher ? ` (${esc(it.F.teacher)})` : ''}?`;
+    return `<strong>${fn}</strong> asked to go with <strong>${esc(it.F.name)}</strong>, but ${esc(it.why)}.`;
+  };
+  const btns = it => {
+    const s = it.s.id, b = [];
+    if (it.kind === 'maybe'){
+      b.push(`<button class="btn sm primary" data-pa="confirm" data-s="${s}" data-f="${it.F.id}" ${canJoin(it.F) ? '' : 'disabled'}>Yes, pair them</button>`);
+      b.push(`<button class="btn sm" data-pa="reject" data-s="${s}" data-f="${it.F.id}">Not them</button>`);
+    }
+    if (it.kind === 'blocked' && canJoin(it.F)) b.push(`<button class="btn sm" data-pa="confirm" data-s="${s}" data-f="${it.F.id}">Pair them anyway</button>`);
+    if (it.kind === 'missing') b.push(`<button class="btn sm" data-pa="wait" data-s="${s}">Keep waiting</button>`);
+    b.push(`<button class="btn sm" data-pa="anyone" data-s="${s}">Switch to any partner</button>`);
+    b.push(`<button class="btn sm" data-pa="solo" data-s="${s}">Go solo</button>`);
+    return b.join('');
+  };
+  $('#p-partners').innerHTML = `
+    <h2>Needs a decision</h2>
+    ${items.length ? items.map(it => `<div class="review"><p>${text(it)}</p><div class="actions">${btns(it)}</div></div>`).join('')
+      : `<p class="note" style="margin-bottom:24px">No friend requests need a decision.</p>`}
+    <h2>Any-partner group</h2>
+    <p class="note">These students are paired at random each time through the rotation, with a new partner each time when possible. An odd number makes one group of three.</p>
+    ${pool.length ? `<ul class="plain">${pool.map(s => `<li><span class="member ${s.active ? '' : 'off'}"><span class="nm">${esc(s.name)}</span> <span class="sub">${metaOf(s)}</span></span>
+        <span class="rowbtns">${studentBtns(s)}<button class="btn sm" data-pa="solo" data-s="${s.id}">Go solo</button></span></li>`).join('')}</ul>`
+      : `<p class="note" style="margin-bottom:24px">Nobody chose "any partner" yet.</p>`}
+    ${waiting.length ? `<h2>Waiting on a friend</h2><p class="note">These students take their turn solo until their friend signs up.</p><ul class="plain">${waiting.map(s => `<li><span>${esc(s.name)} <span class="note">waiting on ${esc(s.friendRaw)}</span></span>
+        <span class="rowbtns"><button class="btn sm" data-pa="anyone" data-s="${s.id}">Switch to any partner</button><button class="btn sm" data-pa="solo" data-s="${s.id}">Go solo</button></span></li>`).join('')}</ul>` : ''}
+    <h2>Friend pairs</h2>
+    ${pairs.length ? `<ul class="plain">${pairs.map(uid => `<li><span class="unitnames">${esc(state.units[uid].members.map(m => S(m).name).join(' & '))}</span>
+        <button class="btn sm" data-pa="split" data-u="${uid}">Split up</button></li>`).join('')}</ul>`
+      : `<p class="note">No friend pairs yet.</p>`}
+    <p class="note">A friend request only becomes a pair when the friend signed up too, and didn't choose to go solo or name someone else.</p>`;
+}
+function renderRoster(){
+  if (!state.order.length){ $('#rosterBody').innerHTML = `<div class="empty">No turns yet. Import sign-ups or add a name above.</div>`; return; }
+  const L = leaderTurn(), n = state.order.length, c = state.cycle;
+  const prefTag = s => prefOf(s) === 'friend' ? `<span class="tag ${single(s.id) ? 'wait' : 'pair'}">asked for ${esc(s.friendRaw)}</span>` : '';
+  $('#rosterBody').innerHTML = `<div class="tablewrap"><table>
+    <thead><tr><th>#</th><th>Who</th><th>Turn</th></tr></thead>
+    <tbody>${state.order.map((uid, i) => { const u = state.units[uid]; const isL = L && L.uid === uid;
+      const who = u.random
+        ? `<div class="member"><span class="tag pair">random pair</span> <span class="nm">${esc(unitName({uid, c: isL ? L.c : c})) || 'drawn from the any-partner group'}</span></div>`
+        : u.members.map(m => { const s = S(m); return `<div class="member ${s.active ? '' : 'off'}">
+          <span class="nm">${esc(s.name)}</span> <span class="sub">${metaOf(s)}${s.led ? `, led ${s.led}×` : ''}</span> ${prefTag(s)} ${studentBtns(s)}</div>`; }).join('');
+      return `<tr><td class="num">${i+1}</td><td>${who}${isL ? '<span class="tag lead">this week</span>' : ''}</td>
+      <td><div class="rowbtns">
+        <button class="btn sm" data-act="up" data-u="${uid}" aria-label="Move up" ${i === 0 ? 'disabled' : ''}>↑</button>
+        <button class="btn sm" data-act="down" data-u="${uid}" aria-label="Move down" ${i === n-1 ? 'disabled' : ''}>↓</button>
+        <button class="btn sm" data-act="lead" data-u="${uid}" ${!isL && isActiveAt({uid, c}) ? '' : 'disabled'}>Make this week</button>
+        ${u.random ? '' : u.members.length > 1 ? `<button class="btn sm" data-pa="split" data-u="${uid}">Split up</button>` : pairSelect(u.members[0])}
+      </div></td></tr>`; }).join('')}</tbody></table></div>`;
+}
+function pairSelect(sid){
+  const opts = state.order.map(u => state.units[u]).filter(u => !u.random && u.members.length === 1 && u.members[0] !== sid && S(u.members[0]).active)
+    .map(u => `<option value="${u.members[0]}">${esc(S(u.members[0]).name)}</option>`).join('');
+  return opts ? `<select class="pairsel" data-pairwith="${sid}" aria-label="Pair ${esc(S(sid).name)} with"><option value="">Pair with…</option>${opts}</select>` : '';
+}
+function renderHistory(){
+  if (!state.history.length){ $('#historyBody').innerHTML = `<div class="empty">Nothing logged yet. Each week shows up here after you mark it on the "This week" tab.</div>`; return; }
+  const label = {lead:'<span class="tag lead">Led</span>', fill:'<span class="tag fill">Backup</span>', skip:'<span class="tag skip">Skipped</span>'};
+  $('#historyBody').innerHTML = `<div class="tablewrap"><table><thead><tr><th>Week of</th><th>Result</th><th>Who</th><th>Note</th></tr></thead>
+    <tbody>${state.history.map(h => `<tr><td>${fmtDate(h.date)}</td><td>${label[h.type]}</td><td>${esc(h.name)}</td><td class="note">${esc(h.note)}</td></tr>`).join('')}</tbody></table></div>`;
+}
+
+/* ---------- partner + student actions ---------- */
+function newUnitFor(sid){ const id = newId('u'); state.units[id] = { id, members:[sid], locked:true }; state.order.push(id); }
+function partnerAction(b){
+  const act = b.dataset.pa, s = b.dataset.s && S(b.dataset.s);
+  checkpoint();
+  if (act === 'confirm'){ const F = S(b.dataset.f); if (F && canJoin(F)) joinFriend(s, F, true); toast('Paired'); }
+  if (act === 'reject') s.rejected.push(b.dataset.f);
+  if (act === 'wait') s.resolved = 'wait';
+  if (act === 'anyone'){ s.resolved = 'anyone'; const u = single(s.id); if (u) removeUnit(u.id); toast(`${s.name} joined the any-partner group`); }
+  if (act === 'solo'){ s.resolved = 'solo'; if (!unitOf(s.id)) newUnitFor(s.id); }
+  if (act === 'split'){
+    const u = state.units[b.dataset.u], idx = state.order.indexOf(u.id);
+    const rest = u.members.splice(1); u.locked = true;
+    rest.forEach((m, k) => { if (prefOf(S(m)) === 'anyone') return; const id = newId('u'); state.units[id] = { id, members:[m], locked:true }; state.order.splice(idx+1+k, 0, id); });
+    if (prefOf(S(u.members[0])) === 'anyone') removeUnit(u.id);
+    toast('Split up');
+  }
+  save(); render();
+}
+async function studentAction(b){
+  const sid = b.dataset.s, s = S(sid), act = b.dataset.sa;
+  if (act === 'remove' && !(await askConfirm(`Remove ${s.name} from the roster? Past history stays.`, 'Remove'))) return;
+  checkpoint();
+  if (act === 'toggle') s.active = !s.active;
+  if (act === 'remove'){
+    const u = unitOf(sid);
+    if (u){ u.members = u.members.filter(m => m !== sid); if (!u.members.length) removeUnit(u.id); }
+    delete state.students[sid];
+    Object.values(state.students).forEach(o => { o.rejected = o.rejected.filter(r => r !== sid); o.partners = o.partners.filter(r => r !== sid); });
+  }
+  save(); render();
+}
+document.addEventListener('click', e => {
+  const pa = e.target.closest('button[data-pa]'); if (pa) return partnerAction(pa);
+  const sa = e.target.closest('button[data-sa]'); if (sa) return studentAction(sa);
+});
+document.addEventListener('change', e => {
+  if (e.target.matches('select[data-pairwith]') && e.target.value){
+    const s = S(e.target.dataset.pairwith), F = S(e.target.value);
+    if (s && F){ checkpoint(); joinFriend(s, F, true); save(); render(); toast('Paired'); }
+  }
+  const d = e.target.dataset && e.target.dataset.skip;
+  if (d){ checkpoint(); const set = new Set(state.skipDates || []); e.target.checked ? set.add(d) : set.delete(d); state.skipDates = [...set].sort(); save(); render(); }
+});
+$('#rosterBody').addEventListener('click', e => {
+  const b = e.target.closest('button[data-act]'); if (!b) return;
+  const act = b.dataset.act, uid = b.dataset.u, i = state.order.indexOf(uid);
+  checkpoint();
+  if (act === 'up' && i > 0) [state.order[i-1], state.order[i]] = [state.order[i], state.order[i-1]];
+  if (act === 'down' && i < state.order.length-1) [state.order[i+1], state.order[i]] = [state.order[i], state.order[i+1]];
+  if (act === 'lead') state.currentId = uid;
+  save(); render();
+});
+
+function addStudent(r){
+  const sid = newId('s');
+  state.students[sid] = { id:sid, name:r.name, grade:r.grade||'', teacher:r.teacher||'', pref:r.pref||'solo', friendRaw:r.friendRaw||'', rejected:[], partners:[], resolved:null, active:true, led:0, added:new Date().toISOString() };
+  if (prefOf(state.students[sid]) !== 'anyone'){ const uid = newId('u'); state.units[uid] = { id:uid, members:[sid], locked:false }; state.order.push(uid); }
+}
+const known = n => Object.values(state.students).some(s => norm(s.name) === norm(n));
+$('#addBtn').onclick = () => {
+  const n = $('#addName').value.trim().replace(/\s+/g,' '); if (!n) return;
+  if (known(n)){ toast(`${n} is already on the roster`); return; }
+  checkpoint(); addStudent({ name:n }); $('#addName').value = ''; save(); render(); toast(`Added ${n}`);
+};
+$('#addName').addEventListener('keydown', e => { if (e.key === 'Enter') $('#addBtn').click(); });
+$('#shuffleBtn').onclick = async () => {
+  if (state.order.length < 2 || !(await askConfirm("Shuffle the rotation order? This week's turn stays at the top.", 'Shuffle'))) return;
+  checkpoint();
+  const L = leaderTurn(), rest = shuffle(state.order.filter(id => !L || id !== L.uid));
+  state.order = L ? [L.uid, ...rest] : rest;
+  if (L){ state.currentId = L.uid; state.cycle = L.c; }
+  state.poolSig = ''; // reshuffle the random pairs too
+  save(); render(); toast('Order shuffled');
+};
+
+/* ---------- files ---------- */
+async function offer(filename, data){
+  if (downloads){
+    try { await downloads.save({ filename, data }); }
+    catch(e){ if (e && e.code !== 'declined') toast('That file could not be saved here.'); }
+    return;
+  }
+  const type = filename.endsWith('.csv') ? 'text/csv' : 'application/json';
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([data], { type }));
+  a.download = filename;
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+}
+$('#exportBtn').onclick = () => offer(`pledge-roster-backup-${new Date().toISOString().slice(0,10)}.json`, JSON.stringify(state, null, 2));
+$('#restoreFile').onchange = async e => {
+  const f = e.target.files[0]; if (!f) return;
+  try {
+    const data = JSON.parse(await f.text());
+    if (!data.students || !Array.isArray(data.order)) throw new Error('bad');
+    if (!(await askConfirm('Replace the current roster with this backup?', 'Replace'))) return;
+    checkpoint(); state = migrate(data); save(); render(); toast('Backup restored');
+  } catch(err){ toast('That file is not a Pledge Roster backup.'); }
+  e.target.value = '';
+};
+$('#resetBtn').onclick = async () => {
+  if (!(await askConfirm('Clear the whole roster, schedule, and history?', 'Clear everything'))) return;
+  checkpoint(); state = blank(); save(); render(); toast('Cleared. Undo is on the This week tab.');
+};
+const csvCell = v => /[",\n]/.test(v) ? '"' + v.replace(/"/g,'""') + '"' : v;
+$('#csvBtn').onclick = () => {
+  const rows = [['Date','On the intercom','Advisory','Backup']].concat(upcoming(+$('#weeksShown').value).map(w => w.skip
+    ? [fmtDate(w.date), 'No Pledge (break)', '', '']
+    : [fmtDate(w.date), unitName(w.leader), activeMembers(w.leader).map(m => S(m).teacher).filter(Boolean).join(' & '), w.backup ? unitName(w.backup) : '']));
+  offer('pledge-schedule.csv', rows.map(r => r.map(csvCell).join(',')).join('\n'));
+};
+$('#copyBtn').onclick = async () => {
+  const lines = upcoming(+$('#weeksShown').value).map(w => w.skip ? `${fmtDate(w.date)}: No Pledge (break)`
+    : `${fmtDate(w.date)}: ${unitName(w.leader)}${w.backup ? ` (backup: ${unitName(w.backup)})` : ''}`);
+  try { await navigator.clipboard.writeText('Pledge of Allegiance Schedule\n' + lines.join('\n')); toast('Schedule copied'); }
+  catch(e){ toast('Copy failed. Use Download for Sheets instead.'); }
+};
+$('#weeksShown').onchange = () => { renderSchedule(); if (drawsDirty){ drawsDirty = false; persist(); } };
+
+/* ---------- CSV import ---------- */
+function parseCSV(text){
+  const rows = []; let row = [], field = '', q = false;
+  text = text.replace(/^\uFEFF/, '');
+  for (let i = 0; i < text.length; i++){
+    const c = text[i];
+    if (q){ if (c === '"'){ if (text[i+1] === '"'){ field += '"'; i++; } else q = false; } else field += c; }
+    else if (c === '"') q = true;
+    else if (c === ','){ row.push(field); field = ''; }
+    else if (c === '\n' || c === '\r'){ if (c === '\r' && text[i+1] === '\n') i++; row.push(field); rows.push(row); row = []; field = ''; }
+    else field += c;
+  }
+  if (field !== '' || row.length){ row.push(field); rows.push(row); }
+  return rows.filter(r => r.some(v => v.trim() !== ''));
+}
+const guess = (headers, ...tests) => { const h = headers.map(x => x.toLowerCase()); for (const t of tests){ const i = h.findIndex(t); if (i >= 0) return i; } return -1; };
+const MAPS = ['#mName','#mLast','#mGrade','#mTeacher','#mPref','#mFriend'];
+$('#csvFile').onchange = async e => {
+  const f = e.target.files[0]; if (!f) return;
+  $('#csvName').textContent = f.name;
+  const rows = parseCSV(await f.text()); e.target.value = '';
+  if (rows.length < 2){ toast('That file has no responses yet.'); return; }
+  csvRows = rows; const H = rows[0];
+  const opts = '<option value="-1">(none)</option>' + H.map((h,i) => `<option value="${i}">${esc(h || 'Column ' + (i+1))}</option>`).join('');
+  MAPS.forEach(s => $(s).innerHTML = opts);
+  const friend = guess(H, h => h.includes('friend') && (h.includes('name') || h.includes('who')));
+  const isName = h => h.includes('name') && !h.includes('friend') && !h.includes('teacher') && !h.includes('user');
+  const first = guess(H, h => isName(h) && h.includes('first'));
+  $('#mName').value = first >= 0 ? first : guess(H, isName);
+  $('#mLast').value = first >= 0 ? guess(H, h => isName(h) && h.includes('last')) : -1;
+  $('#mGrade').value = guess(H, h => h.includes('grade'));
+  $('#mTeacher').value = guess(H, h => h.includes('advisory'), h => h.includes('homeroom'), h => h.includes('teacher'));
+  $('#mFriend').value = friend;
+  $('#mPref').value = H.findIndex((h, i) => i !== friend && /partner|solo|by yourself|alone|with someone|how would you|friend/i.test(h));
+  $('#mapStep').hidden = false; updatePreview();
+};
+MAPS.forEach(s => $(s).addEventListener('change', updatePreview));
+function parsePref(v, friend){
+  v = (v || '').toLowerCase();
+  let p = /friend|specific|someone i choose/.test(v) ? 'friend'
+        : /any|don.?t (care|mind)|either|whoever/.test(v) ? 'anyone'
+        : /myself|solo|alone|by my|on my own/.test(v) ? 'solo'
+        : friend ? 'friend' : 'solo';
+  if (p === 'friend' && !friend) p = 'anyone';
+  return p;
+}
+function mappedRows(){
+  const [n,l,g,t,p,f] = MAPS.map(s => +$(s).value);
+  if (n < 0) return [];
+  const col = (r, i) => i >= 0 ? (r[i] || '').trim() : '';
+  return csvRows.slice(1).map(r => {
+    const friendRaw = col(r, f).replace(/\s+/g,' ');
+    return { name: [col(r,n), col(r,l)].join(' ').trim().replace(/\s+/g,' '), grade: col(r,g), teacher: col(r,t), friendRaw, pref: parsePref(col(r,p), friendRaw) };
+  }).filter(r => r.name);
+}
+function splitNew(){
+  const seen = new Set(Object.values(state.students).map(s => norm(s.name))), fresh = [], dup = [];
+  for (const r of mappedRows()){ if (seen.has(norm(r.name))) dup.push(r); else { seen.add(norm(r.name)); fresh.push(r); } }
+  return { fresh, dup };
+}
+function updatePreview(){
+  if (!csvRows) return;
+  if (+$('#mName').value < 0){ $('#importPreview').textContent = 'Pick the column that holds student names.'; $('#doImport').disabled = true; return; }
+  const { fresh, dup } = splitNew();
+  const c = k => fresh.filter(r => r.pref === k).length;
+  $('#importPreview').textContent = fresh.length
+    ? `${fresh.length} new student${fresh.length>1?'s':''}: ${c('solo')} solo, ${c('anyone')} any partner, ${c('friend')} asking for a friend${dup.length ? `. ${dup.length} already on the roster will be skipped` : ''}.`
+    : `No new students found${dup.length ? ` (${dup.length} already on the roster)` : ''}.`;
+  $('#doImport').disabled = !fresh.length;
+}
+$('#doImport').onclick = () => {
+  const { fresh } = splitNew(); if (!fresh.length) return;
+  checkpoint();
+  try {
+    fresh.forEach(addStudent);
+    const paired = autoPair();
+    if (!state.weekDate) state.weekDate = nextMonday();
+    save(); render(); updatePreview();
+    const rv = reviewItems().length;
+    toast(`Added ${fresh.length}, made ${paired} friend pair${paired === 1 ? '' : 's'}${rv ? `, ${rv} to review on Partners` : ''}`);
+  } catch(err){
+    state = JSON.parse(undoStack.pop()); render();
+    $('#importPreview').textContent = `Import stopped: ${err.message}. Nothing was added.`;
+  }
+};
+
+/* ---------- tabs ---------- */
+function showTab(name){
+  document.querySelectorAll('nav button').forEach(b => b.setAttribute('aria-selected', b.dataset.tab === name));
+  document.querySelectorAll('.panel').forEach(p => p.classList.toggle('on', p.id === 'p-' + name));
+}
+document.querySelectorAll('nav button').forEach(b => b.onclick = () => showTab(b.dataset.tab));
+
+state = loadLocal();
+render();
+connect();
+</script>
+</body>
+</html>
