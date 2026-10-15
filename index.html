@@ -114,7 +114,7 @@ td.num{color:var(--muted);width:2.5em}
 @media (max-width:780px){.report-layout{grid-template-columns:1fr}}
 .ropts{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:16px 18px}
 .ropts label{display:block;margin:0 0 12px;font-weight:600;font-size:.95rem}
-.ropts input[type=text],.ropts textarea,.ropts select{display:block;width:100%;font:inherit;font-weight:400;margin-top:4px;padding:6px 8px;border:1px solid var(--line);border-radius:8px;background:var(--paper);color:var(--ink)}
+.ropts input[type=text],.ropts input[type=number],.ropts textarea,.ropts select{display:block;width:100%;font:inherit;font-weight:400;margin-top:4px;padding:6px 8px;border:1px solid var(--line);border-radius:8px;background:var(--paper);color:var(--ink)}
 .ropts .chk{display:flex;gap:8px;align-items:center;font-weight:400;margin-bottom:8px}
 .ropts .chk input{width:18px;height:18px;accent-color:var(--blue);flex:none}
 .ropts .grp{margin:14px 0 6px;font-family:var(--head);font-size:1rem}
@@ -277,7 +277,7 @@ nav .count{display:inline-block;min-width:1.4em;margin-left:6px;padding:0 6px;bo
         <button class="btn primary" id="printReport" style="width:100%;margin-bottom:16px">Print or save as PDF</button>
         <label>Title<input type="text" id="rTitle"></label>
         <label>Subtitle<input type="text" id="rSub" placeholder="Optional, e.g. Fall schedule"></label>
-        <label>Upcoming weeks to list<select id="rWeeks"><option>4</option><option>6</option><option>8</option><option>12</option></select></label>
+        <label>Upcoming weeks to list<input type="number" id="rWeeks" min="1" max="52" step="1" inputmode="numeric"></label>
         <div class="grp">Include</div>
         <label class="chk"><input type="checkbox" id="rBanner"> Header picture</label>
         <label class="chk"><input type="checkbox" id="rAdvisory"> Advisory teachers</label>
@@ -642,7 +642,17 @@ function render(){
   renderWeek(); renderSchedule(); renderPartners(); renderRoster(); renderHistory(); renderReport(); renderAdvisory();
   if (drawsDirty){ drawsDirty = false; persist(); }
 }
-const metaOf = s => [s.grade && `Grade ${esc(s.grade)}`, s.teacher && esc(s.teacher)].filter(Boolean).join(', ');
+// "6", "6th", "6th grade", "sixth" all become "6th Grade"
+function gradeLabel(g){
+  g = String(g || '').trim(); if (!g) return '';
+  const words = { sixth:6, seventh:7, eighth:8, fifth:5, ninth:9 };
+  const m = g.match(/\d+/), w = Object.keys(words).find(k => g.toLowerCase().includes(k));
+  const n = m ? +m[0] : w ? words[w] : null;
+  if (n === null) return capName(g);
+  const suf = n % 100 >= 11 && n % 100 <= 13 ? 'th' : ({1:'st',2:'nd',3:'rd'})[n % 10] || 'th';
+  return `${n}${suf} Grade`;
+}
+const metaOf = s => [s.grade && esc(gradeLabel(s.grade)), s.teacher && esc(s.teacher)].filter(Boolean).join(', ');
 // One advisory line when everyone shares it; otherwise "Austen & Ramsey: Moore; Kai: Lee"
 function groupDetails(people, detailFn){
   const groups = [];
@@ -1057,9 +1067,11 @@ function fillReportForm(){
   for (const [id, k] of Object.entries(RFIELDS)){ const el = $('#' + id); if (el.type === 'checkbox') el.checked = !!o[k]; else el.value = o[k]; }
 }
 for (const [id, k] of Object.entries(RFIELDS)){
-  $('#' + id).addEventListener(id === 'rTitle' || id === 'rSub' || id === 'rNote' ? 'input' : 'change', e => {
+  $('#' + id).addEventListener(id === 'rTitle' || id === 'rSub' || id === 'rNote' || id === 'rWeeks' ? 'input' : 'change', e => {
     const el = e.target;
-    state.report = Object.assign(ropts(), { [k]: el.type === 'checkbox' ? el.checked : k === 'weeks' ? +el.value : el.value });
+    if (k === 'weeks' && !(+el.value >= 1)) return;   // wait until a real number is typed
+    const val = k === 'weeks' ? Math.min(52, Math.max(1, Math.round(+el.value))) : el.type === 'checkbox' ? el.checked : el.value;
+    state.report = Object.assign(ropts(), { [k]: val });
     persist(); renderReport();
   });
 }
@@ -1069,12 +1081,12 @@ const longDate = iso => { const [y,m,d] = iso.split('-').map(Number);
 function renderReport(){
   const o = ropts(), el = $('#report');
   const people = t => activeMembers(t).map(S);
-  const detail = s => [o.grade && s.grade && `Grade ${esc(s.grade)}`, o.advisory && s.teacher && esc(s.teacher)].filter(Boolean).join(', ');
+  const detail = s => [o.grade && s.grade && esc(gradeLabel(s.grade)), o.advisory && s.teacher && esc(s.teacher)].filter(Boolean).join(', ');
   const names = t => people(t).map(s => esc(s.name)).join(' &amp; ');
   const details = t => groupDetails(people(t), detail);
   const head = `${o.banner ? `<img class="banner" src="${BANNER}" alt="">` : ''}<div class="rbody">
     <h1 class="rtitle">${esc(o.title)}</h1>${o.sub ? `<p class="rsub">${esc(o.sub)}</p>` : ''}<div class="rule"></div>`;
-  const all = upcoming(80), first = all.findIndex(w => !w.skip);
+  const all = upcoming(Math.max(80, ropts().weeks * 3)), first = all.findIndex(w => !w.skip);
   if (first < 0){ el.innerHTML = head + `<p>The schedule appears here once students are on the roster.</p></div>`; return; }
   const up = all[first], rest = [];
   let n = 0;
