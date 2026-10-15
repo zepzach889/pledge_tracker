@@ -275,7 +275,8 @@ function migrate(st){
     st.units = {};
     st.order = st.order.map(sid => { const id = newId('u'); st.units[id] = { id, members:[sid], locked:false }; if (st.currentId === sid) st.currentId = id; return id; });
   }
-  Object.values(st.students).forEach(s => { s.pref = s.pref || 'solo'; s.friendRaw = s.friendRaw || ''; s.rejected = s.rejected || []; s.partners = s.partners || []; });
+  Object.values(st.students).forEach(s => { s.pref = s.pref || 'solo'; s.friendRaw = s.friendRaw || ''; s.rejected = s.rejected || []; s.partners = s.partners || []; s.dropped = s.dropped || []; s.waiting = s.waiting || [];
+    if (s.resolved === 'wait'){ s.waiting = friendNames(s); s.resolved = null; } });
   if ((st.v || 0) < 3){
     // older versions made permanent "any partner" pairs; move those students into the random pool
     for (const uid of [...st.order]){
@@ -436,8 +437,22 @@ function unitName(t){ const a = activeMembers(t), all = membersAt(t); return (a.
 const firstNames = t => activeMembers(t).map(m => S(m).name.split(' ')[0]).join(' & ');
 
 /* ---------- friend matching ---------- */
-function matchFriend(s){
-  const raw = norm(s.friendRaw); if (!raw) return null;
+const MAX_GROUP = 4;
+// "Cara and Jo" / "Cara, Jo" = wants both; "Cara or Jo" = either one
+function friendNames(s){
+  const raw = String(s.friendRaw || '').trim(); if (!raw) return [];
+  const drop = s.dropped || [];
+  return raw.split(/\s*(?:,|;|&|\+|\/|\n|\band\b|\bor\b)\s*/i).map(x => x.trim().replace(/\s+/g,' ')).filter(x => norm(x) && !drop.includes(x));
+}
+const friendMode = s => /\bor\b/i.test(s.friendRaw || '') ? 'any' : 'all';
+const sameUnit = (a, b) => { const u = unitOf(a); return !!u && u.members.includes(b); };
+function outstanding(s){
+  const u = unitOf(s.id);
+  if (friendMode(s) === 'any' && u && u.members.length > 1) return [];
+  return friendNames(s).filter(r => { const m = matchName(s, r); return !(m && sameUnit(s.id, m.id)); });
+}
+function matchName(s, rawName){
+  const raw = norm(rawName); if (!raw) return null;
   const others = Object.values(state.students).filter(o => o.id !== s.id);
   const exact = others.filter(o => norm(o.name) === raw);
   if (exact.length === 1) return { type:'exact', id: exact[0].id };
@@ -468,40 +483,45 @@ function joinFriend(s, F, locked){
 }
 function blockReason(s, F){
   if (!F.active) return `${F.name} is paused`;
-  const fu = unitOf(F.id);
+  const fu = unitOf(F.id), su = unitOf(s.id);
   if (fu && fu.members.length > 1) return `${F.name} is already paired with ${fu.members.filter(m => m !== F.id).map(m => S(m).name).join(', ')}`;
   if (prefOf(F) === 'solo') return `${F.name} signed up to go solo`;
-  if (prefOf(F) === 'friend'){ const back = matchFriend(F); if (!back || back.id !== s.id) return `${F.name} asked for a different friend (${F.friendRaw})`; }
+  if (prefOf(F) === 'friend' && !friendNames(F).some(r => { const m = matchName(F, r); return m && m.id === s.id; }))
+    return `${F.name} asked for someone else (${F.friendRaw})`;
+  if (su && su.members.length + 1 > MAX_GROUP) return `the group would be bigger than ${MAX_GROUP}`;
   return null;
 }
 function autoPair(){
   let paired = 0;
-  for (const uid of [...state.order]){
-    const u = state.units[uid]; if (!u || u.random || u.members.length !== 1 || u.locked) continue;
-    const s = S(u.members[0]);
-    if (!s.active || prefOf(s) !== 'friend' || s.resolved === 'wait') continue;
-    const m = matchFriend(s); if (!m || m.type !== 'exact') continue;
-    const F = S(m.id), fu = unitOf(F.id);
-    if (fu && fu.locked) continue;
-    if (!blockReason(s, F)){ joinFriend(s, F, false); paired++; }
+  for (const s of Object.values(state.students)){
+    if (!s.active || prefOf(s) !== 'friend') continue;
+    const u = unitOf(s.id); if (!u || (u.locked && u.members.length === 1)) continue;
+    for (const r of outstanding(s)){
+      if (friendMode(s) === 'any' && unitOf(s.id).members.length > 1) break;
+      const m = matchName(s, r); if (!m || m.type !== 'exact' || sameUnit(s.id, m.id)) continue;
+      const F = S(m.id), fu = unitOf(F.id);
+      if (fu && fu.locked && fu.members.length === 1) continue;
+      if (!blockReason(s, F)){ joinFriend(s, F, false); paired++; }
+    }
   }
   return paired;
 }
+function friendStudents(){ return state.order.map(uid => state.units[uid]).filter(u => !u.random).flatMap(u => u.members.map(S)).filter(s => s.active && prefOf(s) === 'friend'); }
 function reviewItems(){
   const items = [];
-  for (const uid of state.order){
-    const u = state.units[uid]; if (u.random || u.members.length !== 1) continue;
-    const s = S(u.members[0]);
-    if (!s.active || prefOf(s) !== 'friend' || s.resolved === 'wait') continue;
-    const m = matchFriend(s);
-    if (!m) items.push({ s, kind:'missing' });
-    else if (m.type === 'maybe') items.push({ s, kind:'maybe', F: S(m.id) });
-    else { const why = blockReason(s, S(m.id)); if (why) items.push({ s, kind:'blocked', F: S(m.id), why }); }
+  for (const s of friendStudents()){
+    for (const raw of outstanding(s)){
+      if (s.waiting.includes(raw)) continue;
+      const m = matchName(s, raw);
+      if (!m) items.push({ s, raw, kind:'missing' });
+      else if (m.type === 'maybe') items.push({ s, raw, kind:'maybe', F: S(m.id) });
+      else { const why = blockReason(s, S(m.id)); if (why) items.push({ s, raw, kind:'blocked', F: S(m.id), why }); }
+    }
   }
   return items;
 }
-const waitingList = () => state.order.map(uid => state.units[uid]).filter(u => !u.random && u.members.length === 1)
-  .map(u => S(u.members[0])).filter(s => s.active && prefOf(s) === 'friend' && s.resolved === 'wait');
+const waitingOn = s => outstanding(s).filter(r => s.waiting.includes(r));
+const waitingList = () => friendStudents().filter(s => waitingOn(s).length);
 
 /* ---------- weekly actions ---------- */
 function log(type, t, note){ state.history.unshift({ date: state.weekDate, type, name: t ? unitName(t) : '', note: note || '', at: new Date().toISOString() }); }
@@ -543,7 +563,7 @@ const unitMeta = t => activeMembers(t).map(m => { const x = metaOf(S(m)); return
 function waitingFlag(t){
   const u = state.units[t.uid]; if (u.random || u.members.length !== 1) return '';
   const s = S(u.members[0]);
-  return prefOf(s) === 'friend' ? `${esc(s.name.split(' ')[0])} asked for a friend who isn't paired yet. Check the Partners tab.` : '';
+  return prefOf(s) === 'friend' && outstanding(s).length ? `${esc(s.name.split(' ')[0])} asked for a friend who isn't paired yet. Check the Partners tab.` : '';
 }
 function renderWeek(){
   const el = $('#p-week'), L = leaderTurn();
@@ -600,9 +620,10 @@ function renderPartners(){
   const pairs = state.order.filter(uid => !state.units[uid].random && state.units[uid].members.length > 1);
   const text = it => {
     const s = it.s, fn = esc(s.name);
-    if (it.kind === 'missing') return `<strong>${fn}</strong> asked to go with <strong>${esc(s.friendRaw)}</strong>, who hasn't signed up.`;
-    if (it.kind === 'maybe') return `<strong>${fn}</strong> asked for "${esc(s.friendRaw)}". Did they mean <strong>${esc(it.F.name)}</strong>${it.F.teacher ? ` (${esc(it.F.teacher)})` : ''}?`;
-    return `<strong>${fn}</strong> asked to go with <strong>${esc(it.F.name)}</strong>, but ${esc(it.why)}.`;
+    const also = friendNames(s).length > 1 ? ` <span class="note">(their full request: ${esc(s.friendRaw)})</span>` : '';
+    if (it.kind === 'missing') return `<strong>${fn}</strong> asked to go with <strong>${esc(it.raw)}</strong>, who hasn't signed up.${also}`;
+    if (it.kind === 'maybe') return `<strong>${fn}</strong> asked for "${esc(it.raw)}"${also}. Did they mean <strong>${esc(it.F.name)}</strong>${it.F.teacher ? ` (${esc(it.F.teacher)})` : ''}?`;
+    return `<strong>${fn}</strong> asked to go with <strong>${esc(it.F.name)}</strong>, but ${esc(it.why)}.${also}`;
   };
   const btns = it => {
     const s = it.s.id, b = [];
@@ -611,9 +632,12 @@ function renderPartners(){
       b.push(`<button class="btn sm" data-pa="reject" data-s="${s}" data-f="${it.F.id}">Not them</button>`);
     }
     if (it.kind === 'blocked' && canJoin(it.F)) b.push(`<button class="btn sm" data-pa="confirm" data-s="${s}" data-f="${it.F.id}">Pair them anyway</button>`);
-    if (it.kind === 'missing') b.push(`<button class="btn sm" data-pa="wait" data-s="${s}">Keep waiting</button>`);
-    b.push(`<button class="btn sm" data-pa="anyone" data-s="${s}">Switch to any partner</button>`);
-    b.push(`<button class="btn sm" data-pa="solo" data-s="${s}">Go solo</button>`);
+    if (it.kind === 'missing') b.push(`<button class="btn sm" data-pa="wait" data-s="${s}" data-r="${esc(it.raw)}">Keep waiting</button>`);
+    if (friendNames(it.s).length > 1 || !single(s)) b.push(`<button class="btn sm" data-pa="drop" data-s="${s}" data-r="${esc(it.raw)}">Skip this name</button>`);
+    if (single(s)){
+      b.push(`<button class="btn sm" data-pa="anyone" data-s="${s}">Switch to any partner</button>`);
+      b.push(`<button class="btn sm" data-pa="solo" data-s="${s}">Go solo</button>`);
+    }
     return b.join('');
   };
   $('#p-partners').innerHTML = `
@@ -625,13 +649,13 @@ function renderPartners(){
     ${pool.length ? `<ul class="plain">${pool.map(s => `<li><span class="member ${s.active ? '' : 'off'}"><span class="nm">${esc(s.name)}</span> <span class="sub">${metaOf(s)}</span></span>
         <span class="rowbtns">${studentBtns(s)}<button class="btn sm" data-pa="solo" data-s="${s.id}">Go solo</button></span></li>`).join('')}</ul>`
       : `<p class="note" style="margin-bottom:24px">Nobody chose "any partner" yet.</p>`}
-    ${waiting.length ? `<h2>Waiting on a friend</h2><p class="note">These students take their turn solo until their friend signs up.</p><ul class="plain">${waiting.map(s => `<li><span>${esc(s.name)} <span class="note">waiting on ${esc(s.friendRaw)}</span></span>
-        <span class="rowbtns"><button class="btn sm" data-pa="anyone" data-s="${s.id}">Switch to any partner</button><button class="btn sm" data-pa="solo" data-s="${s.id}">Go solo</button></span></li>`).join('')}</ul>` : ''}
-    <h2>Friend pairs</h2>
+    ${waiting.length ? `<h2>Waiting on a friend</h2><p class="note">Until their friend signs up, these students take their turn solo or with whoever they're already grouped with.</p><ul class="plain">${waiting.map(s => `<li><span>${esc(s.name)} <span class="note">waiting on ${esc(waitingOn(s).join(', '))}</span></span>
+        <span class="rowbtns">${waitingOn(s).map(r => `<button class="btn sm" data-pa="drop" data-s="${s.id}" data-r="${esc(r)}">Stop waiting on ${esc(r)}</button>`).join('')}${single(s.id) ? `<button class="btn sm" data-pa="anyone" data-s="${s.id}">Switch to any partner</button><button class="btn sm" data-pa="solo" data-s="${s.id}">Go solo</button>` : ''}</span></li>`).join('')}</ul>` : ''}
+    <h2>Friend pairs and groups</h2>
     ${pairs.length ? `<ul class="plain">${pairs.map(uid => `<li><span class="unitnames">${esc(state.units[uid].members.map(m => S(m).name).join(' & '))}</span>
         <button class="btn sm" data-pa="split" data-u="${uid}">Split up</button></li>`).join('')}</ul>`
       : `<p class="note">No friend pairs yet.</p>`}
-    <p class="note">A friend request only becomes a pair when the friend signed up too, and didn't choose to go solo or name someone else.</p>`;
+    <p class="note">A friend request only becomes a pair when the friend signed up too, and didn't choose to go solo or name only other people. Names joined by "and" or commas make a group (up to ${MAX_GROUP}); names joined by "or" mean either friend is fine.</p>`;
 }
 function renderRoster(){
   if (!state.order.length){ $('#rosterBody').innerHTML = `<div class="empty">No turns yet. Import sign-ups or add a name above.</div>`; return; }
@@ -669,9 +693,10 @@ function newUnitFor(sid){ const id = newId('u'); state.units[id] = { id, members
 function partnerAction(b){
   const act = b.dataset.pa, s = b.dataset.s && S(b.dataset.s);
   checkpoint();
-  if (act === 'confirm'){ const F = S(b.dataset.f); if (F && canJoin(F)) joinFriend(s, F, true); toast('Paired'); }
+  if (act === 'confirm'){ const F = S(b.dataset.f); if (F && canJoin(F)) joinFriend(s, F, true); autoPair(); toast('Paired'); }
   if (act === 'reject') s.rejected.push(b.dataset.f);
-  if (act === 'wait') s.resolved = 'wait';
+  if (act === 'wait'){ if (!s.waiting.includes(b.dataset.r)) s.waiting.push(b.dataset.r); }
+  if (act === 'drop'){ if (!s.dropped.includes(b.dataset.r)) s.dropped.push(b.dataset.r); s.waiting = s.waiting.filter(x => x !== b.dataset.r); autoPair(); }
   if (act === 'anyone'){ s.resolved = 'anyone'; const u = single(s.id); if (u) removeUnit(u.id); toast(`${s.name} joined the any-partner group`); }
   if (act === 'solo'){ s.resolved = 'solo'; if (!unitOf(s.id)) newUnitFor(s.id); }
   if (act === 'split'){
@@ -720,7 +745,7 @@ $('#rosterBody').addEventListener('click', e => {
 
 function addStudent(r){
   const sid = newId('s');
-  state.students[sid] = { id:sid, name:r.name, grade:r.grade||'', teacher:r.teacher||'', pref:r.pref||'solo', friendRaw:r.friendRaw||'', rejected:[], partners:[], resolved:null, active:true, led:0, added:new Date().toISOString() };
+  state.students[sid] = { id:sid, name:r.name, grade:r.grade||'', teacher:r.teacher||'', pref:r.pref||'solo', friendRaw:r.friendRaw||'', rejected:[], partners:[], dropped:[], waiting:[], resolved:null, active:true, led:0, added:new Date().toISOString() };
   if (prefOf(state.students[sid]) !== 'anyone'){ const uid = newId('u'); state.units[uid] = { id:uid, members:[sid], locked:false }; state.order.push(uid); }
 }
 const known = n => Object.values(state.students).some(s => norm(s.name) === norm(n));
@@ -850,7 +875,7 @@ function updatePreview(){
   const { fresh, dup } = splitNew();
   const c = k => fresh.filter(r => r.pref === k).length;
   $('#importPreview').textContent = fresh.length
-    ? `${fresh.length} new student${fresh.length>1?'s':''}: ${c('solo')} solo, ${c('anyone')} any partner, ${c('friend')} asking for a friend${dup.length ? `. ${dup.length} already on the roster will be skipped` : ''}.`
+    ? `${fresh.length} new student${fresh.length>1?'s':''}: ${c('solo')} solo, ${c('anyone')} any partner, ${c('friend')} asking for a friend${fresh.some(r => /,|;|&|\band\b|\bor\b/i.test(r.friendRaw)) ? ` (some named more than one)` : ''}${dup.length ? `. ${dup.length} already on the roster will be skipped` : ''}.`
     : `No new students found${dup.length ? ` (${dup.length} already on the roster)` : ''}.`;
   $('#doImport').disabled = !fresh.length;
 }
